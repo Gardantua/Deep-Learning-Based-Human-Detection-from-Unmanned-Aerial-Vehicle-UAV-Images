@@ -1,0 +1,16 @@
+# Large datasets - not tracked in git
+datasets/
+visdrone_human.zip
+VisDrone2019-DET-train/
+VisDrone2019-DET-val/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
