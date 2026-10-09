@@ -1,184 +1,39 @@
-# Deep Learning-Based Human Detection from UAV Images 🚁
+# Drone görüntülerinde insan tespiti — YOLO ve VisDrone
 
-> 🚧 **Work In Progress** — This project is still under active development. Accuracy improvements are ongoing.
+VisDrone görüntülerinde insan tespiti üzerine yaptığım bilgisayarlı görü çalışması. VisDrone'un `pedestrian` ve `people` sınıflarını tek bir insan sınıfında birleştirip YOLOv8n ile bir eğitim denemesi yaptım. Bu repo veri dönüşüm kodunu ve o denemenin kayıtlarını içeriyor.
 
-A computer vision project that fine-tunes a **YOLOv8** object detection model to detect humans (pedestrians and people) in aerial images captured by drones (UAVs), using the **VisDrone 2019** benchmark dataset.
+## Bu repoda ne var?
 
----
+- [convert_visdrone_to_yolo.py](convert_visdrone_to_yolo.py): piksel koordinatlarını normalize YOLO kutularına dönüştürüyor. Yalnız 1 ve 2 numaralı sınıfları alıyor; insan içermeyen görüntüleri çıktı setine koymuyor.
+- [results/args.yaml](results/args.yaml): kaydedilmiş eğitim ayarları. YOLOv8n, 50 epoch, batch 16 ve 640 piksel görüntü boyutu kullanılmış.
+- [results/results.csv](results/results.csv): epoch bazında kayıp ve değerlendirme sonuçları.
+- `results/weights/`: bu denemeye ait `best.pt` ve `last.pt` ağırlıkları.
 
-## 📋 Table of Contents
+## Kaydedilmiş sonuç
 
-- [Overview](#overview)
-- [Dataset](#dataset)
-- [Data Preprocessing](#data-preprocessing)
-- [Model & Training](#model--training)
-- [Current Results](#current-results)
-- [Result Visualizations](#result-visualizations)
-- [Planned Improvements](#planned-improvements)
-- [Getting Started](#getting-started)
+Aşağıdaki değerler `results.csv` içindeki **50. epoch** satırından geliyor; ayrı bir test seti sonucu veya makale sonucu olarak sunmuyorum.
 
----
+| Ölçüt | Değer |
+|---|---:|
+| Precision | 0.61758 |
+| Recall | 0.41878 |
+| mAP@50 | 0.46723 |
+| mAP@50–95 | 0.18720 |
 
-## Overview
+Özellikle küçük ve kalabalık insan görüntülerinde kaçırılan tespitler var. Tek eğitim kaydı üzerinden genelleme veya aşırı öğrenme hakkında kesin sonuç çıkarmıyorum.
 
-Detecting humans from drone footage is a challenging task due to:
-- **Small object sizes** — people appear very small from high altitude
-- **Dense crowds** — many individuals clustered together
-- **Varied backgrounds** — roads, rooftops, parks, etc.
+## Veri dönüşümünü çalıştırma
 
-This project trains a lightweight **YOLOv8n** (nano) model purely on the human classes from VisDrone, mapping them into a single unified class: **Human**.
-
----
-
-## Dataset
-
-**[VisDrone 2019](https://github.com/VisDrone/VisDrone-Dataset)** — a large-scale benchmark for drone-based vision tasks.
-
-| Split | Images | (Filtered — humans only) |
-|---|---|---|
-| Train | 6,471 | ~5,684 |
-| Val | 548 | ~531 |
-
-**VisDrone classes used:**
-- Class 1: Pedestrian → merged into `0: Human`
-- Class 2: People → merged into `0: Human`
-
-All other classes (cars, trucks, buses, bicycles, etc.) are discarded.
-
-> ⚠️ The raw dataset is not included in this repo due to its large size. Download it from the [VisDrone official page](https://github.com/VisDrone/VisDrone-Dataset).
-
----
-
-## Data Preprocessing
-
-The script `convert_visdrone_to_yolo.py` converts VisDrone annotations to YOLO format:
-
-| VisDrone Format | YOLO Format |
-|---|---|
-| `x_min, y_min, width, height` (pixels) | `x_center, y_center, width, height` (normalized 0–1) |
-
-**Usage:**
 ```bash
+python -m venv .venv
+python -m pip install opencv-python tqdm
 python convert_visdrone_to_yolo.py
 ```
 
-This will:
-1. Read images and annotation `.txt` files from `VisDrone2019-DET-train/` and `VisDrone2019-DET-val/`
-2. Filter only human detections (classes 1 & 2)
-3. Convert coordinates to YOLO format
-4. Output to `datasets/visdrone_human/train/` and `datasets/visdrone_human/val/`
+Kurulumu sanal ortamı etkinleştirdikten sonra yap. Ham veriyi [VisDrone'un kendi deposundan](https://github.com/VisDrone/VisDrone-Dataset) edinip köke `VisDrone2019-DET-train/` ve `VisDrone2019-DET-val/` klasörleriyle yerleştir. Kod `images/` ve `annotations/` alt klasörlerini bekliyor; çıktı `datasets/visdrone_human/` altında oluşuyor. Ham veri repoya dahil değil.
 
----
+Eğitim kaydı Google Colab'daki `/content/data.yaml` dosyasına referans veriyor. Bu YAML ve eğitim notebook'u repoda bulunmadığından repo tek başına o koşuyu birebir yeniden üretmiyor. Ağırlık dosyalarının da yalnız güvenilen kaynaklardan yüklenmesi gerekir.
 
-## Model & Training
+## Çalışmanın kapsamı
 
-| Parameter | Value |
-|---|---|
-| Base model | `yolov8n.pt` (pretrained on COCO) |
-| Task | Object Detection |
-| Epochs | 50 |
-| Batch size | 16 |
-| Image size | 640 × 640 |
-| Optimizer | Auto (SGD) |
-| IoU threshold | 0.7 |
-| Platform | Google Colab |
-
-Training was run on Google Colab with a GPU. The `args.yaml` in `results/` contains the full configuration.
-
----
-
-## Current Results
-
-> ⚠️ These are preliminary results — the model is still being improved.
-
-| Metric | Epoch 1 | Epoch 50 |
-|---|---|---|
-| mAP@50 | 0.242 | **0.467** |
-| mAP@50-95 | 0.081 | **0.187** |
-| Precision | 0.384 | **0.618** |
-| Recall | 0.278 | **0.419** |
-| Train Box Loss | 2.752 | 2.054 |
-
-The model shows consistent improvement across all 50 epochs, with no signs of overfitting.
-
----
-
-## Result Visualizations
-
-**Training Metrics:**
-
-![Training Results](results/results.png)
-
-**Precision-Recall Curve:**
-
-![PR Curve](results/BoxPR_curve.png)
-
-**F1 Score Curve:**
-
-![F1 Curve](results/BoxF1_curve.png)
-
-**Confusion Matrix:**
-
-![Confusion Matrix](results/confusion_matrix_normalized.png)
-
-**Validation Predictions (sample):**
-
-![Val Batch 0 Predictions](results/val_batch0_pred.jpg)
-
----
-
-## Planned Improvements
-
-- [ ] Use a larger YOLOv8 variant (`yolov8s`, `yolov8m`) for better accuracy
-- [ ] Train for more epochs (100+)
-- [ ] Include background images (no-human frames) to reduce false positives
-- [ ] Apply stronger data augmentation (mosaic, mixup)
-- [ ] Experiment with multi-scale training
-- [ ] Evaluate on the VisDrone test set
-
----
-
-## Getting Started
-
-### Requirements
-
-```bash
-pip install ultralytics opencv-python tqdm
-```
-
-### 1. Download the Dataset
-
-Download **VisDrone2019-DET-train** and **VisDrone2019-DET-val** from the [official VisDrone repo](https://github.com/VisDrone/VisDrone-Dataset) and place them in the project root.
-
-### 2. Convert Annotations
-
-```bash
-python convert_visdrone_to_yolo.py
-```
-
-### 3. Train
-
-Create a `data.yaml` file:
-
-```yaml
-path: ./datasets/visdrone_human
-train: train/images
-val: val/images
-nc: 1
-names: ['Human']
-```
-
-Then train:
-
-```python
-from ultralytics import YOLO
-
-model = YOLO('yolov8n.pt')
-model.train(data='data.yaml', epochs=50, imgsz=640, batch=16)
-```
-
----
-
-## License
-
-This project uses the [VisDrone Dataset](https://github.com/VisDrone/VisDrone-Dataset) which is for non-commercial research use. Please refer to the original dataset license for details.
+Burada mevcut kodu ve kayıtlı denemeyi paylaşıyorum. Bu README makalenin kabul edildiği veya yayımlandığı anlamına gelmiyor.
